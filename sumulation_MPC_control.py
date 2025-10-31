@@ -24,7 +24,7 @@ N = 5 #MPC horizon
 x_s = 0.6 #desired equilibrium
 
 #Non linear MPC parameters - cost function l = sum(over N) w*(x-x_s)^2+g^2
-w = 1000
+w = 10000
 g_max = 20 
 
 #step calculation
@@ -87,6 +87,7 @@ x_MPC_value[0] = X0
 x_euler_values = np.zeros(nrT)
 x_euler_values[0] = X0
 F = probability_ode(x,g,A,G)
+q = 0
 
 for k in range(0, nrT-1): #nrT-1
     #controlled dynamic
@@ -95,17 +96,18 @@ for k in range(0, nrT-1): #nrT-1
     g_temp = sol.value(g_OP)
     g_MPC_value[k] = g_temp[0]
     x_MPC_value[k+1] = x_MPC_value[k] + h*F(x_MPC_value[k],g_MPC_value[k])
+    print(x_s - x_MPC_value[k+1])
     #uncontrolled dynamic
     x_euler_values[k+1] = x_euler_values[k] + h*F(x_euler_values[k],0)
 
 
 #plotting
-time = np.linspace(0, T, nrT)
-plt.figure(figsize=(12, 6))
-plt.plot(time, x_euler_values, label='Euler Method', linestyle='--', color='blue')
-plt.plot(time, x_MPC_value, label='NMPC Method',color='orange')
-plt.plot(time, g_MPC_value, label='Gain', color='red' )
-plt.show()
+# time = np.linspace(0, T, nrT)
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, x_euler_values, label='Euler Method', linestyle='--', color='blue')
+# plt.plot(time, x_MPC_value, label='NMPC Method',color='orange')
+# plt.plot(time, g_MPC_value, label='Gain', color='red' )
+# plt.show()
 
 
 
