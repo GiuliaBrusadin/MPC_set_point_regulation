@@ -10,22 +10,27 @@ import matplotlib.pyplot as plt
 #variable declaration
 A = np.zeros((2,2))
 A[0,0] = 1 #a
-A[0,1] = 3 #b
-A[1,0] = 0 #c
-A[1,1] = 2 #d
+A[0,1] = 2 #b
+A[1,0] = 0.8 #c
+A[1,1] = 1.7 #d
 
 G = np.zeros((2,2))
 G[1,0] = 1 #G3
 #G[0,1] = 1 #G2
 
-T = 4 #interval 0-T
+alpha = 0.2#A[0,0]-A[1,0] #a - c
+beta = 0.3#A[0,1]-A[1,1] #b - d
+
+T = 15 #interval 0-T
 X0 = 0.8 #initial condition
-N = 5 #MPC horizon
-x_s = 0.6 #desired equilibrium
+N = 10 #MPC horizon
+x_s = 0.4 #desired equilibrium
+g_sd = (alpha*x_s-beta*x_s+beta)/x_s#gain at the equilibrium for dominant srategy
+g_sa = A[0,0]+A[1,1]-A[1,0]-A[0,1]+(beta/x_s) #gain at the equilibrium for anticoordination games
 
 #Non linear MPC parameters - cost function l = sum(over N) w*(x-x_s)^2+g^2
 w = 10000
-g_max = 20 
+g_max = 5 
 
 #step calculation
 #using MAX payoff as Lipschitz constant
@@ -57,22 +62,26 @@ def probability_ode(x,g,A,G):
 opti = cas.Opti()
 x_OP = opti.variable(N,1)
 g_OP = opti.variable(N,1)
-p = opti.parameter(5,1) #w, x_s, x0, g_max and h
+p = opti.parameter(7,1) #w, x_s, x0, g_max, h, g_p, g_s
 
 def cost_function(x_OP,g_OP,p):
     #since sum() is not accepted, do it in matrix form
     P2 = p[1]*cas.DM.ones(N)
-    return p[0]*cas.mtimes(cas.transpose(x_OP-P2),(x_OP-P2))+cas.mtimes(cas.transpose(g_OP),g_OP)
+    P7 = p[6]*cas.DM.ones(N)
+    return p[0]*cas.mtimes(cas.transpose(x_OP-P2),(x_OP-P2))+cas.mtimes(cas.transpose(g_OP-P7),(g_OP-P7))
 
 opti.minimize(cost_function(x_OP,g_OP,p))
 
-for k in range(0, N-1):
+for k in range(0, N-2):
     f = probability_ode(x,g,A,G)
     #discretized dynamics using Euler'e method - x (k+1) = x(k)+h*f(x(k),u(k))
     opti.subject_to(x_OP[k+1] == x_OP[k] + p[4]*f(x_OP[k],g_OP[k]))
 opti.subject_to(x_OP[0] == p[2])
 opti.subject_to(g_OP[:] > 0)
 opti.subject_to(g_OP[:] < p[3])
+#opti.subject_to((p[5]-2) <= g_OP[0])
+opti.subject_to(g_OP[0] <= (p[5]+0.5)) #limit gain increase
+opti.subject_to(x_OP[N-1] == p[1]) #set precision
 # opti.subject_to(x_OP[:] > 0)
 # opti.subject_to(x_OP[:] < 1)
 
@@ -91,23 +100,30 @@ q = 0
 
 for k in range(0, nrT-1): #nrT-1
     #controlled dynamic
-    opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h])
+    g_prec = g_MPC_value[k-1]
+    opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h,g_prec,g_sd])
     sol = opti.solve()
     g_temp = sol.value(g_OP)
     g_MPC_value[k] = g_temp[0]
     x_MPC_value[k+1] = x_MPC_value[k] + h*F(x_MPC_value[k],g_MPC_value[k])
-    print(x_s - x_MPC_value[k+1])
+    #print(x_s - x_MPC_value[k+1])
     #uncontrolled dynamic
     x_euler_values[k+1] = x_euler_values[k] + h*F(x_euler_values[k],0)
 
 
+g_normalized = g_MPC_value/g_max
+print('time step:',h)
+print('max gain:',np.max(g_MPC_value))
+print('final uncontrolled x:',x_euler_values[(nrT-1)])
+print('final controlled x:',x_MPC_value[(nrT-1)])
+
 #plotting
-# time = np.linspace(0, T, nrT)
-# plt.figure(figsize=(12, 6))
-# plt.plot(time, x_euler_values, label='Euler Method', linestyle='--', color='blue')
-# plt.plot(time, x_MPC_value, label='NMPC Method',color='orange')
-# plt.plot(time, g_MPC_value, label='Gain', color='red' )
-# plt.show()
+time = np.linspace(0, T, (nrT-2))
+plt.figure(figsize=(12, 6))
+plt.plot(time, x_euler_values[1:(nrT-1)], label='Euler Method', linestyle='--', color='blue')
+plt.plot(time, x_MPC_value[1:(nrT-1)], label='NMPC Method',color='orange')
+plt.plot(time, g_normalized[1:(nrT-1)], label='Gain', color='red' )
+plt.show()
 
 
 
