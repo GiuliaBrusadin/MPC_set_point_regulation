@@ -73,12 +73,10 @@ for i in range(nrT-1):
     x_values[i+1] = x_values[i] + h*step[0]
     g_values[i+1] = g_values[i] + h*step[1]
 
-max_value_g = np.max(g_values)
-g_normalized = g_values/max_value_g
-print('max gain:',max_value_g)
+
 # #plotting
 time = np.linspace(0,T,(nrT-2))
 plt.figure(figsize=(12, 6))
 plt.plot(time, x_values[1:(nrT-1)], label='x controlled',color='blue')
-plt.plot(time, g_normalized[1:(nrT-1)], label='Gain', color='red' )
+plt.plot(time, g_values[1:(nrT-1)], label='Gain', color='red' )
 plt.show()
