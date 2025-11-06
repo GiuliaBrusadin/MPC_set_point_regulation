@@ -9,28 +9,32 @@ import matplotlib.pyplot as plt
 
 #variable declaration
 A = np.zeros((2,2))
-A[0,0] = 1 #a
-A[0,1] = 2 #b
-A[1,0] = 0.8 #c
-A[1,1] = 1.7 #d
+A[0,0] = 1.5   #a
+A[0,1] = 2   #b
+A[1,0] = 2    #c
+A[1,1] = 1    #d
 
 G = np.zeros((2,2))
-#G[1,0] = 1 #G3
+G[1,0] = 1 #G3
 #G[0,1] = 1 #G2
-G[1,1] = 1 #G4
+#G[1,1] = 1 #G4
 
-alpha = 0.2#A[0,0]-A[1,0] #a - c
-beta = 0.3#A[0,1]-A[1,1] #b - d
+alpha = A[0,0]-A[1,0] #a - c 
+beta = A[0,1]-A[1,1] #b - d 
+x_system = -beta/(-alpha-beta) #equilibrium for anticorodination games
 
 T = 40 #interval 0-T
-X0 = 0.8 #initial condition
+X0 = 0.1 #initial condition
 N = 10 #MPC horizon
-x_s = 0.4 #desired equilibrium
-g_sd = (alpha*x_s-beta*x_s+beta)/x_s#gain at the equilibrium for dominant srategy
-g_sa = A[0,0]+A[1,1]-A[1,0]-A[0,1]+(beta/x_s) #gain at the equilibrium for anticoordination games
+x_s = 0.3 #desired equilibrium
+#gain at the equilibrium
+g_eq = alpha + beta*((1-x_s)/x_s) #G3
+#g_eq = beta - ((alpha*x_s)/(x_s-1)) #G4
+#g_eq = ((alpha - beta)*x_s+beta)/(x_s-1) #G2 - dominant strategy brings to xeq = 0
+
 
 #Non linear MPC parameters - cost function l = sum(over N) w*(x-x_s)^2+g^2
-w = 100
+w = 1000
 g_max = 5 
 
 #step calculation
@@ -67,8 +71,8 @@ p = opti.parameter(7,1) #w, x_s, x0, g_max, h, g_p, g_s
 
 def cost_function(x_OP,g_OP,p):
     #since sum() is not accepted, do it in matrix form
-    P2 = p[1]*cas.DM.ones(N)
-    P7 = p[6]*cas.DM.ones(N)
+    P2 = p[1]*cas.DM.ones(N) #vector of equilibrium state
+    P7 = p[6]*cas.DM.ones(N) #vector of equilibrium gain
     return p[0]*cas.mtimes(cas.transpose(x_OP-P2),(x_OP-P2))+cas.mtimes(cas.transpose(g_OP-P7),(g_OP-P7))
 
 opti.minimize(cost_function(x_OP,g_OP,p))
@@ -81,8 +85,8 @@ opti.subject_to(x_OP[0] == p[2])
 opti.subject_to(g_OP[:] > 0)
 opti.subject_to(g_OP[:] < p[3])
 #opti.subject_to((p[5]-2) <= g_OP[0])
-opti.subject_to(g_OP[0] <= (p[5]+0.5)) #limit gain increase
-opti.subject_to(x_OP[N-1] == p[1]) #set precision
+#opti.subject_to(g_OP[0] <= (p[5]+0.5)) #limit gain increase
+opti.subject_to(x_OP[N-1] == p[1]) #terminal constraints
 # opti.subject_to(x_OP[:] > 0)
 # opti.subject_to(x_OP[:] < 1)
 
@@ -102,7 +106,7 @@ q = 0
 for k in range(0, nrT-1): #nrT-1
     #controlled dynamic
     g_prec = g_MPC_value[k-1]
-    opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h,g_prec,g_sd])
+    opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h,g_prec,g_eq])
     sol = opti.solve()
     g_temp = sol.value(g_OP)
     g_MPC_value[k] = g_temp[0]
@@ -118,8 +122,10 @@ for k in range(0, nrT-1): #nrT-1
 g_normalized = g_MPC_value/g_max
 print('max gain:',np.max(g_MPC_value))
 print('final uncontrolled x:',x_euler_values[(nrT-1)])
-name = ("ds_G3_"+("%s"%g_max)+"_"+("%s"%w)+"_dgnull")
-path_and_name = ("/home/giulia/Documents/Evolutionary_GT/Graphs/"+name+".png")
+#print('final controlled x:',x_MPC_value[(nrT-1)])
+print('gain at equilibrium',g_eq)
+name = ("ac_G3_"+("%s"%g_max)+"_"+("%s"%w)+"_dgnull")
+path_and_name = ("/home/giulia/Documents/Evolutionary_GT/Graphs/anti_coordination/ac_G3/ac_G3_x0_lower/"+name+".png")
 
 #plotting
 time = np.linspace(0, T, (nrT-2))
