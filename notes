@@ -8,4 +8,5 @@ plot x*(1-x)*(a*x+b+(1-x)-((c+g)*x+d*(1-x))) from x=0 to 1
 FOR G4
 x*(1-x)*((a*x +b*(1-x)) - (c*x + (d+g)*(1-x))) = 0 for g
 
-
+for G2
+x*(1-x)*((a*x +(b+g)*(1-x)) - (c*x + d*(1-x))) = 0 for g

@@ -9,32 +9,31 @@ import matplotlib.pyplot as plt
 
 #variable declaration
 A = np.zeros((2,2))
-A[0,0] = 1 #a
-A[0,1] = 3 #b
-A[1,0] = 0 #c
-A[1,1] = 2 #d
+A[0,0] = 1.5 #a
+A[0,1] = 1 #b
+A[1,0] = 1.3 #c
+A[1,1] = 0.7 #d
 
 G = np.zeros((2,2))
 G[1,0] = 1 #G3
 #G[0,1] = 1 #G2
 
-alpha = 0.2#A[0,0]-A[1,0] #a - c
-beta = 0.3#A[0,1]-A[1,1] #b - d
+alpha = A[0,0]-A[1,0] #a - c
+beta = A[0,1]-A[1,1] #b - d
 
 T = 100 #interval 0-T
-X0 = 0.8 #initial condition
+X0 = 0.4 #initial condition
 G0 = 0.2 #initial gain
 N = 5 #MPC horizon
-x_s = 0.4 #desired equilibrium
+x_s = 0.8 #desired equilibrium
 p = 0.1
 g_sd = (alpha*x_s-beta*x_s+beta)/x_s#gain at the equilibrium for dominant srategy
-g_sa = A[0,0]+A[1,1]-A[1,0]-A[0,1]+(beta/x_s) #gain at the equilibrium for anticoordination games
 print(g_sd)
 
 #step calculation
 #using MAX payoff as Lipschitz constant - this si not relevant to this usecase, 
 #but it allows to keep all simulations with the same step to help comparison
-g_max = 20
+g_max = 5
 gA = A + (G*g_max)
 MAX = 0.0
 for i in range(0,2):

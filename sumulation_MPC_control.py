@@ -6,13 +6,14 @@ import casadi as cas
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import pandas as pd
 
 #variable declaration
 A = np.zeros((2,2))
-A[0,0] = 1.5   #a
-A[0,1] = 2   #b
-A[1,0] = 2    #c
-A[1,1] = 1    #d
+A[0,0] = 1.5 #a
+A[0,1] = 1   #b
+A[1,0] = 1.3 #c
+A[1,1] = 0.7 #d
 
 G = np.zeros((2,2))
 G[1,0] = 1 #G3
@@ -24,18 +25,19 @@ beta = A[0,1]-A[1,1] #b - d
 x_system = -beta/(-alpha-beta) #equilibrium for anticorodination games
 
 T = 40 #interval 0-T
-X0 = 0.1 #initial condition
+X0 = 0.8 #initial condition
 N = 10 #MPC horizon
-x_s = 0.3 #desired equilibrium
+x_s = 0.4 #desired equilibrium
 #gain at the equilibrium
 g_eq = alpha + beta*((1-x_s)/x_s) #G3
 #g_eq = beta - ((alpha*x_s)/(x_s-1)) #G4
-#g_eq = ((alpha - beta)*x_s+beta)/(x_s-1) #G2 - dominant strategy brings to xeq = 0
+#g_eq = ((alpha - beta)*x_s+beta)/(x_s-1) #G2 
 
 
 #Non linear MPC parameters - cost function l = sum(over N) w*(x-x_s)^2+g^2
-w = 1000
+w = 10
 g_max = 5 
+delta_g = 0.5
 
 #step calculation
 #using MAX payoff as Lipschitz constant
@@ -67,7 +69,7 @@ def probability_ode(x,g,A,G):
 opti = cas.Opti()
 x_OP = opti.variable(N,1)
 g_OP = opti.variable(N,1)
-p = opti.parameter(7,1) #w, x_s, x0, g_max, h, g_p, g_s
+p = opti.parameter(8,1) #w, x_s, x0, g_max, h, g_p, g_s, delta_g
 
 def cost_function(x_OP,g_OP,p):
     #since sum() is not accepted, do it in matrix form
@@ -85,7 +87,7 @@ opti.subject_to(x_OP[0] == p[2])
 opti.subject_to(g_OP[:] > 0)
 opti.subject_to(g_OP[:] < p[3])
 #opti.subject_to((p[5]-2) <= g_OP[0])
-#opti.subject_to(g_OP[0] <= (p[5]+0.5)) #limit gain increase
+opti.subject_to(g_OP[0] <= (p[5]+p[7])) #limit gain increase
 opti.subject_to(x_OP[N-1] == p[1]) #terminal constraints
 # opti.subject_to(x_OP[:] > 0)
 # opti.subject_to(x_OP[:] < 1)
@@ -102,11 +104,12 @@ x_euler_values = np.zeros(nrT)
 x_euler_values[0] = X0
 F = probability_ode(x,g,A,G)
 q = 0
+index_eq = 0
 
 for k in range(0, nrT-1): #nrT-1
     #controlled dynamic
     g_prec = g_MPC_value[k-1]
-    opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h,g_prec,g_eq])
+    opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h,g_prec,g_eq,delta_g])
     sol = opti.solve()
     g_temp = sol.value(g_OP)
     g_MPC_value[k] = g_temp[0]
@@ -114,9 +117,15 @@ for k in range(0, nrT-1): #nrT-1
     #print(x_s - x_MPC_value[k+1])
     if( q==0 and x_s ==(float('%.3f'%(x_MPC_value[k+1])))):
        print('eq.reached for k =',(k+1), 'with h =', h)  
+       index_eq = k+1
        q = 1     
     #uncontrolled dynamic
     x_euler_values[k+1] = x_euler_values[k] + h*F(x_euler_values[k],0)
+
+#data = np.column_stack([x_euler_values,x_MPC_value,g_MPC_value])
+#DF = pd.DataFrame(data)
+#DF.to_csv("./data.csv")
+#data analisys
 
 
 g_normalized = g_MPC_value/g_max
@@ -124,8 +133,15 @@ print('max gain:',np.max(g_MPC_value))
 print('final uncontrolled x:',x_euler_values[(nrT-1)])
 #print('final controlled x:',x_MPC_value[(nrT-1)])
 print('gain at equilibrium',g_eq)
-name = ("ac_G3_"+("%s"%g_max)+"_"+("%s"%w)+"_dgnull")
+name = ("ac_G3_"+("%s"%g_max)+"_"+("%s"%w)+"_dg05")
 path_and_name = ("/home/giulia/Documents/Evolutionary_GT/Graphs/anti_coordination/ac_G3/ac_G3_x0_lower/"+name+".png")
+
+gain_integral = 0.0
+for k in range(index_eq):
+    gain_integral += h*g_MPC_value[k]
+
+print('gain energy is:', gain_integral)
+
 
 #plotting
 time = np.linspace(0, T, (nrT-2))
@@ -138,7 +154,5 @@ plt.plot(time, g_normalized[1:(nrT-1)], label='Gain', color='red',linewidth=3 )
 plt.legend(loc= 'upper right')
 #plt.savefig(path_and_name, format = 'png')
 plt.show()
-
-
 
 
