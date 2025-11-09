@@ -14,6 +14,7 @@ def step_calculation(M):
     return (2.0/MAX) 
 
 def probability_ode(x,g,A,G):
+    #Define systems dynamic
     gA = A + (G*g)
     r = [gA[0,0]*x + gA[0,1]*(1-x), gA[1,0]*x + gA[1,1]*(1-x)]
     dx = x*(1-x)*(r[0]-r[1]) #replicator equation 
@@ -36,7 +37,8 @@ def MPC_problem_formulation(opti,N,f,x_OP,g_OP,p):
     opti.subject_to(x_OP[0] == p[2])
     opti.subject_to(g_OP[:] > 0)
     opti.subject_to(g_OP[:] < p[3])
-    opti.subject_to(g_OP[0] <= (p[5]+p[7])) #limit gain increase
+    opti.subject_to(g_OP[0] <= (p[5]+p[7]))#limit gain increase
+    opti.subject_to(g_OP[0] >= (p[5]-p[7]))#limit gain decrease
     opti.subject_to(x_OP[N-1] == p[1]) #terminal constraints
     
     return opti, p
@@ -54,6 +56,50 @@ def gain_info(control, index_eq, h):
         gain_integral += h*control[k]
     
     return max_gain, gain_integral
+
+def MPC_simulation(x,g,A,G,N,nrT,X0,w,g_max,h,g_eq,x_s,delta_g):
+
+    f = probability_ode(x,g,A,G)
+    opti = cas.Opti()
+    x_OP = opti.variable(N,1)
+    g_OP = opti.variable(N,1)
+    p = opti.parameter(8,1) #w, x_s, x0, g_max, h, g_p, g_s, delta_g
+    MPC_problem_formulation(opti,N,f,x_OP,g_OP,p)
+    opts = {'ipopt.print_level':0, 'print_time':0}
+    opti.solver('ipopt',opts)
+
+    #Non-linear MPC loop
+    x_MPC_value = np.zeros(nrT)
+    g_MPC_value = np.zeros(nrT)
+    g_temp = np.zeros(N)
+    x_MPC_value[0] = X0
+    F = probability_ode(x,g,A,G)
+    q = 0
+    index_eq = 0
+
+    for k in range(0, nrT-1): #nrT-1
+        #controlled dynamic
+        g_prec = g_MPC_value[k-1]
+        opti.set_value(p,[w,x_s,x_MPC_value[k], g_max,h,g_prec,g_eq,delta_g])
+        sol = opti.solve()
+        g_temp = sol.value(g_OP)
+        g_MPC_value[k] = g_temp[0]
+        x_MPC_value[k+1] = x_MPC_value[k] + h*F(x_MPC_value[k],g_MPC_value[k])
+        #print(x_s - x_MPC_value[k+1])
+        if( q==0 and x_s ==(float('%.3f'%(x_MPC_value[k+1])))):
+            #print('eq.reached for k =',(k+1), 'with h =', h)  
+            index_eq = k+1
+            q = 1     
+
+    return x_MPC_value, g_MPC_value,index_eq
+
+def uncontrolled_dynamic(nrT,X0,x,g,A,G,h):
+    x_euler_values = np.zeros(nrT)
+    x_euler_values[0] = X0
+    F = probability_ode(x,g,A,G) #g is 0, but this avoind multiplying =*empty matrix G
+    for k in range(0, nrT-1):
+        x_euler_values[k+1] = x_euler_values[k] + h*F(x_euler_values[k],0)
+    return x_euler_values
 
 
 
