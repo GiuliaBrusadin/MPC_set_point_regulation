@@ -6,12 +6,8 @@ import pandas as pd
 
 def step_calculation(M):
     #step calculation using MAX payoff as Lipschitz constant - M 2x2 matrix
-    MAX = 0.0
-    for i in range(0,2):
-        for k in range(0,2):
-            if MAX < M[i,k]:
-             MAX = M[i,k]
-    return (2.0/MAX) 
+    MAX = max((M[0,0]+M[0,1]),(M[1,0]+M[1,1]))
+    return (1.0/MAX) 
 
 def probability_ode(x,g,A,G):
     #Define systems dynamic
@@ -23,7 +19,7 @@ def probability_ode(x,g,A,G):
 
 def MPC_problem_formulation(opti,N,f,x_OP,g_OP,p):
      #define cost function and constraints
-    def cost_function(x_OP,g_OP,p):
+    def cost_function(x_OP,g_OP,p): # cost function l = sum(over N) w*(x-x_s)^2+g^2
         #since sum() is not accepted, do it in matrix form
         P2 = p[1]*cas.DM.ones(N) #vector of equilibrium state
         P7 = p[6]*cas.DM.ones(N) #vector of equilibrium gain
@@ -44,12 +40,8 @@ def MPC_problem_formulation(opti,N,f,x_OP,g_OP,p):
     return opti, p
 
 
-def data_print_to_csv(uncontrolled_state, controlled_state, control, name_and_path):
-    data = np.column_stack([uncontrolled_state, controlled_state, control])
-    DF = pd.DataFrame(data)
-    DF.to_csv(name_and_path)
-
 def gain_info(control, index_eq, h):
+    #information on the control gain
     max_gain = np.max(control)
     gain_integral = 0.0
     for k in range(index_eq):
@@ -58,7 +50,7 @@ def gain_info(control, index_eq, h):
     return max_gain, gain_integral
 
 def MPC_simulation(x,g,A,G,N,nrT,X0,w,g_max,h,g_eq,x_s,delta_g):
-
+    #simulation of the entire MPC loop
     f = probability_ode(x,g,A,G)
     opti = cas.Opti()
     x_OP = opti.variable(N,1)
@@ -91,7 +83,7 @@ def MPC_simulation(x,g,A,G,N,nrT,X0,w,g_max,h,g_eq,x_s,delta_g):
             index_eq = k+1
             q = 1     
 
-    return x_MPC_value, g_MPC_value,index_eq
+    return x_MPC_value, g_MPC_value, index_eq
 
 def uncontrolled_dynamic(nrT,X0,x,g,A,G,h):
     x_euler_values = np.zeros(nrT)
