@@ -1,8 +1,6 @@
 #this file contains the function used in code
 import casadi as cas
 import numpy as np
-import math
-import pandas as pd
 
 def step_calculation(M):
     #step calculation using MAX payoff as Lipschitz constant - M 2x2 matrix
